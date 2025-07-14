@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /**
+   * PulseMinds Dark Theme
+   * Optimized for corporate monitoring and data visualization
+   */
+  :root {
+    /* Main PulseMinds theme - dark by default */
+    --background: 218 15% 15%; /* #262626 equivalent in HSL */
+    --foreground: 0 0% 98%;
+
+    --card: 218 15% 18%; /* Slightly lighter than background */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 218 15% 18%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 200 82% 43%; /* #1F82BF */
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 212 97% 15%; /* #022873 */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 218 15% 20%;
+    --muted-foreground: 220 9% 65%;
+
+    --accent: 44 87% 65%; /* #F2CB57 */
+    --accent-foreground: 218 15% 15%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 218 15% 25%;
+    --input: 218 15% 20%;
+    --ring: 200 82% 43%;
+
+    --radius: 0.5rem;
+
+    /* Chart and data visualization colors */
+    --chart-primary: 200 82% 43%; /* #1F82BF */
+    --chart-secondary: 44 87% 65%; /* #F2CB57 */
+    --chart-tertiary: 212 97% 15%; /* #022873 */
+    --chart-accent: 36 94% 43%; /* #D98E04 */
+    --chart-success: 142 76% 36%;
+    --chart-warning: 44 87% 65%;
+    --chart-error: 0 84% 60%;
+
+    /* Data grid and table colors */
+    --table-header: 218 15% 20%;
+    --table-row: 218 15% 17%;
+    --table-row-hover: 218 15% 22%;
+    --table-border: 218 15% 25%;
+  }
+
+  /* Light theme override (optional) */
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 218 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 218 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 218 15% 15%;
+
+    --primary: 200 82% 43%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 218 15% 15%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 44 87% 65%;
+    --accent-foreground: 218 15% 15%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 200 82% 43%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    /* Corporate monitor optimization */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Corporate dashboard typography hierarchy */
+  h1 {
+    @apply text-4xl font-bold tracking-tight;
+  }
+
+  h2 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+
+  h3 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  h4 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+
+  /* Data emphasis classes */
+  .data-large {
+    @apply text-3xl font-bold tabular-nums;
+  }
+
+  .data-medium {
+    @apply text-xl font-semibold tabular-nums;
+  }
+
+  .data-small {
+    @apply text-sm font-medium tabular-nums;
+  }
+
+  /* Chart and visualization containers */
+  .chart-container {
+    @apply bg-card border border-border rounded-lg p-4;
+  }
+
+  /* KPI Card styling */
+  .kpi-card {
+    @apply bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow;
+  }
+
+  /* Table styling for data grids */
+  .data-table {
+    @apply bg-card border border-border rounded-lg overflow-hidden;
+  }
+
+  .data-table th {
+    @apply bg-muted text-muted-foreground font-semibold text-left p-3 border-b border-border;
+  }
+
+  .data-table td {
+    @apply p-3 border-b border-border last:border-b-0;
+  }
+
+  .data-table tr:hover {
+    @apply bg-muted/50;
+  }
+
+  /* Filter and control styling */
+  .filter-container {
+    @apply bg-card border border-border rounded-lg p-4 flex items-center gap-4 flex-wrap;
+  }
+
+  /* Navigation tabs */
+  .nav-tabs {
+    @apply border-b border-border;
+  }
+
+  .nav-tab {
+    @apply px-6 py-3 font-medium text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-primary transition-colors;
+  }
+
+  .nav-tab.active {
+    @apply text-primary border-primary;
+  }
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}
