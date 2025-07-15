@@ -2,6 +2,19 @@ import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  CalendarIcon,
   Download,
   Package,
   Snowflake,
@@ -11,6 +24,7 @@ import {
   AlertTriangle,
   TrendingUp,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import {
   BarChart,
   Bar,
@@ -24,13 +38,22 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   calculateAverages,
   getLatestStockData,
   exportToCSV,
+  type FilterState,
 } from "@/lib/data";
 
 const EstoqueVitrine = () => {
+  const [filters, setFilters] = useState<FilterState>({
+        year: "2025",
+        month: "",
+        week: "",
+        date: undefined,
+      });
   const [rawData, setRawData] = useState<any[]>([]);
 
   useEffect(() => {
@@ -56,45 +79,182 @@ const EstoqueVitrine = () => {
       });
   }, []);
 
+  const dadosFiltrados = useMemo(() => {
+        const meses = {
+          janeiro: 0, fevereiro: 1, março: 2, abril: 3, maio: 4, junho: 5,  
+          julho: 6, agosto: 7, setembro: 8, outubro: 9, novembro: 10, dezembro: 11
+        };
+    
+        const filtrado = rawData.filter((item) => {
+          const dataItem = new Date(item.data);
+          dataItem.setDate(dataItem.getDate() + 1); // ajuste seu
+
+          // 🎯 Se filtro por data estiver ativo, ignora mês e ano
+          if (filters.date) {
+            return dataItem.toDateString() === new Date(filters.date).toDateString();
+          }
+
+          // Caso contrário, usa filtro por mês e ano
+          const anoIgual = dataItem.getFullYear().toString() === filters.year;
+          const mesIgual = dataItem.getMonth() === meses[filters.month];
+          if (!anoIgual || !mesIgual) return false;
+
+          if (filters.week) {
+            const primeiraSemana = new Date(dataItem.getFullYear(), dataItem.getMonth(), 1);
+            const diffDias = (dataItem.getTime() - primeiraSemana.getTime()) / (1000 * 60 * 60 * 24);
+            const semanaItem = Math.floor(diffDias / 7) + 1;
+            return semanaItem.toString() === filters.week;
+          }
+
+          return true;
+        });
+
+    
+        console.log("DADOS FILTRADOS:", filtrado);
+        return filtrado;
+    }, [rawData, filters]);
+
+  const contexto = useMemo(() => {
+    console.log("Contexto atualizado:", filters);
+    if (filters.date) return "dia";
+    if (filters.week) return "semana";
+    return "mês";
+  }, [filters]);
+
+  const dadoDoDia = useMemo(() => {
+    if (contexto === "dia") {
+      console.log("Dado do dia:", dadosFiltrados[0]);
+      return dadosFiltrados[0];
+    }
+    return null;
+  }, [contexto, dadosFiltrados]);
+
+  const dadoDoDiaAnterior = useMemo(() => {
+    if (contexto !== "dia" || !filters.date || !rawData.length) return null;
+
+    const dataAlvo = new Date(filters.date);
+    dataAlvo.setDate(dataAlvo.getDate() - 2); // dia anterior
+
+    return rawData.find(
+      (item) => new Date(item.data).toDateString() === dataAlvo.toDateString()
+    );
+  }, [contexto, filters.date, rawData]);
+
+
   const averages = useMemo(() => calculateAverages(rawData), [rawData]);
   const latestStock = useMemo(() => getLatestStockData(rawData), [rawData]);
 
+  const years = ["2023", "2024", "2025"];
+  const months = [
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+  ];
+  const weeks = Array.from({ length: 52 }, (_, i) => (i + 1).toString());
+
   // Prepare stock comparison data for charts
   const stockComparisonData = useMemo(() => {
-    return rawData.slice(-10).map((item, index) => ({
-      dia: `Dia ${index + 1}`,
+    let dadosParaUsar = rawData;
+
+    if (filters.date && contexto === "dia") {
+      const dataSelecionada = new Date(filters.date).toDateString();
+
+      const index = rawData.findIndex(
+        (item) => new Date(item.data).toDateString() === dataSelecionada
+      );
+
+      if (index > 0) {
+        const start = Math.max(0, index - 10);
+        dadosParaUsar = rawData.slice(start, index + 1);
+      } else {
+        dadosParaUsar = []; // ou [] se não tiver dados anteriores suficientes
+      }
+    } else {
+      dadosParaUsar = rawData.slice(-10); // comportamento padrão
+    }
+
+    return dadosParaUsar.map((item) => ({
+      dia: format(new Date(item.data), "dd/MM", { locale: ptBR }),
       estoque_freezer_kg: item.estoque_freezer_kg,
       estoque_congelador_kg: item.estoque_congelador_kg,
       exposto_na_vitrine_kg: item.exposto_na_vitrine_kg,
       descongelado_para_futuro_kg: item.descongelado_para_futuro_kg,
     }));
-  }, [rawData]);
+  }, [rawData, filters.date, contexto]);
+
+
+  const stockDoDiaFiltrado = useMemo(() => {
+    if (filters.date && contexto === "dia") {
+      const dataAlvo = new Date(filters.date);
+      dataAlvo.setDate(dataAlvo.getDate() - 1); // volta 2 dias
+      const dataAlvoStr = dataAlvo.toDateString();
+      return rawData.find(
+        (item) => new Date(item.data).toDateString() === dataAlvoStr
+      );
+    }
+    return null;
+  }, [filters.date, contexto, rawData]);
+
+
 
   // Pie chart data for current stock distribution
-  const currentStockData = latestStock
+  const currentStockData = stockDoDiaFiltrado
     ? [
         {
           name: "Freezer",
-          value: latestStock.current.estoque_freezer_kg,
+          value: stockDoDiaFiltrado.estoque_freezer_kg,
           color: "#1F82BF",
         },
         {
           name: "Congelador",
-          value: latestStock.current.estoque_congelador_kg,
-          color: "#022873",
+          value: stockDoDiaFiltrado.estoque_congelador_kg,
+          color: "#064ad3ff",
         },
         {
           name: "Exposto na Vitrine",
-          value: latestStock.current.exposto_na_vitrine_kg,
+          value: stockDoDiaFiltrado.exposto_na_vitrine_kg,
           color: "#F2CB57",
         },
         {
           name: "Descongelado p/ Futuro",
-          value: latestStock.current.descongelado_para_futuro_kg,
+          value: stockDoDiaFiltrado.descongelado_para_futuro_kg,
           color: "#D98E04",
         },
       ]
-    : [];
+    : latestStock
+      ? [
+          {
+            name: "Freezer",
+            value: latestStock.current.estoque_freezer_kg,
+            color: "#1F82BF",
+          },
+          {
+            name: "Congelador",
+            value: latestStock.current.estoque_congelador_kg,
+            color: "#064ad3ff",
+          },
+          {
+            name: "Exposto na Vitrine",
+            value: latestStock.current.exposto_na_vitrine_kg,
+            color: "#F2CB57",
+          },
+          {
+            name: "Descongelado p/ Futuro",
+            value: latestStock.current.descongelado_para_futuro_kg,
+            color: "#D98E04",
+          },
+        ]
+      : [];
+
 
   const handleExport = () => {
     exportToCSV(
@@ -108,6 +268,10 @@ const EstoqueVitrine = () => {
   const totalStock =
     latestStock.current.estoque_freezer_kg +
     latestStock.current.estoque_congelador_kg;
+
+  const totalEstoqueDoDia =
+    (dadoDoDia?.estoque_freezer_kg ?? 0) +
+    (dadoDoDia?.estoque_congelador_kg ?? 0);
 
   return (
     <div className="space-y-6">
@@ -130,6 +294,53 @@ const EstoqueVitrine = () => {
         </Button>
       </div>
 
+      <Card className="bg-gradient-to-r from-pulse-secondary/20 to-pulse-primary/20 border-pulse-primary/30">
+        <CardHeader>
+          <CardTitle className="text-xl text-foreground flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5 text-pulse-primary" />
+            Filtros de Período
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {/* Year Filter */}
+            
+            {/* Week Filter */}
+            
+
+            {/* Date Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">
+                Data
+              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal bg-card border-pulse-primary/20"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filters.date
+                      ? format(filters.date, "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecione a data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={filters.date}
+                    onSelect={(date) =>
+                      setFilters((prev) => ({ ...prev, date }))
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stock Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border-blue-500/30">
@@ -141,7 +352,10 @@ const EstoqueVitrine = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-400">
-              {latestStock.current.estoque_freezer_kg} kg
+              {contexto === "dia"
+              ? `${dadoDoDia?.estoque_freezer_kg?.toFixed(2)} kg`
+              : `${latestStock.current.estoque_freezer_kg.toFixed(2)} kg`
+              }
             </div>
             <div className="flex items-center text-xs text-muted-foreground mt-1">
               {latestStock.freezer_trend > 0 ? (
@@ -149,7 +363,10 @@ const EstoqueVitrine = () => {
               ) : (
                 <TrendingUp className="w-3 h-3 text-red-500 mr-1 rotate-180" />
               )}
-              {Math.abs(latestStock.freezer_trend)} kg vs ontem
+              {contexto === "dia"
+              ? `${dadoDoDiaAnterior?.estoque_freezer_kg?.toFixed(2) || "—"} kg`
+              : `${Math.abs(latestStock.freezer_trend)} kg vs ontem`
+              }
             </div>
           </CardContent>
         </Card>
@@ -163,7 +380,10 @@ const EstoqueVitrine = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-pulse-primary">
-              {latestStock.current.estoque_congelador_kg} kg
+              {contexto === "dia"
+              ? `${dadoDoDia?.estoque_congelador_kg?.toFixed(2)} kg`
+              : `${latestStock.current.estoque_congelador_kg.toFixed(2)} kg`
+              }
             </div>
             <div className="flex items-center text-xs text-muted-foreground mt-1">
               {latestStock.congelador_trend > 0 ? (
@@ -171,7 +391,10 @@ const EstoqueVitrine = () => {
               ) : (
                 <TrendingUp className="w-3 h-3 text-red-500 mr-1 rotate-180" />
               )}
-              {Math.abs(latestStock.congelador_trend)} kg vs ontem
+              {contexto === "dia"
+              ? `${dadoDoDiaAnterior?.estoque_congelador_kg?.toFixed(2) || "—"} kg`
+              : `${Math.abs(latestStock.congelador_trend)} kg vs ontem`
+              }
             </div>
           </CardContent>
         </Card>
@@ -185,14 +408,16 @@ const EstoqueVitrine = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-pulse-accent">
-              {latestStock.current.exposto_na_vitrine_kg} kg
+              {contexto === "dia"
+              ? `${dadoDoDia?.exposto_na_vitrine_kg?.toFixed(2)} kg`
+              : `${latestStock.current.exposto_na_vitrine_kg.toFixed(2)} kg`
+              }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {(
-                (latestStock.current.exposto_na_vitrine_kg / totalStock) *
-                100
-              ).toFixed(1)}
-              % do estoque total
+              {contexto === "dia"
+              ? `${((dadoDoDia.exposto_na_vitrine_kg / totalEstoqueDoDia) * 100).toFixed(1)} % do estoque total`
+              : `${((latestStock.current.exposto_na_vitrine_kg / totalStock) * 100).toFixed(1)} % do estoque total`
+              }
             </p>
           </CardContent>
         </Card>
@@ -206,15 +431,17 @@ const EstoqueVitrine = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-500">
-              {averages.quilos_estragados_kg_total} kg
+              {contexto === "dia"
+              ? `${dadoDoDia?.quilos_estragados_kg?.toFixed(2)} kg`
+              : `${averages.quilos_estragados_kg_total.toFixed(2)} kg`
+              }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {(
-                (averages.quilos_estragados_kg_total /
-                  (averages.previsao_venda_kg_media * averages.total_dias)) *
-                100
-              ).toFixed(1)}
-              % perda total
+              
+              {contexto === "dia"
+              ? `Contabilizados Hoje`
+              : `${((averages.quilos_estragados_kg_total / (averages.previsao_venda_kg_media * averages.total_dias)) * 100).toFixed(1)}% perda total`
+              }
             </p>
           </CardContent>
         </Card>
@@ -237,22 +464,39 @@ const EstoqueVitrine = () => {
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
+                    <Pie
                     data={currentStockData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, value, percent }) =>
-                      `${name}: ${value}kg (${(percent * 100).toFixed(1)}%)`
-                    }
                     outerRadius={80}
-                    fill="#8884d8"
+                    fill="#ffaa00ff"
                     dataKey="value"
-                  >
+                    >
                     {currentStockData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
-                  </Pie>
+                    </Pie>
+                    <Legend
+                    verticalAlign="bottom"
+                    align="center"
+                    formatter={(_, entry, index) => {
+                      const data = currentStockData[index];
+                      if (!data) return null;
+                      const percent =
+                      currentStockData.reduce((acc, cur) => acc + cur.value, 0) > 0
+                        ? (data.value /
+                          currentStockData.reduce((acc, cur) => acc + cur.value, 0)) *
+                        100
+                        : 0;
+                      return (
+                      <span>
+                        <span style={{ color: data.color }}>{data.name}</span>:{" "}
+                        {data.value.toFixed(2)}kg ({percent.toFixed(1)}%)
+                      </span>
+                      );
+                    }}
+                    />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
@@ -260,7 +504,9 @@ const EstoqueVitrine = () => {
                       borderRadius: "12px",
                       color: "hsl(var(--foreground))",
                     }}
-                    formatter={(value: any) => [`${value} kg`, "Quantidade"]}
+                    formatter={(value: any) => [
+                      <span style={{ color: "#fff"}}>{`Quantidade: ${value.toFixed(2)} kg`}</span>
+                    ]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -306,7 +552,8 @@ const EstoqueVitrine = () => {
                     }}
                     formatter={(value: any, name: string) => [
                       `${value} kg`,
-                      name === "estoque_freezer_kg" ? "Freezer" : "Congelador",
+                      name === "Freezer" ? "Freezer" : "Congelador",
+                      
                     ]}
                   />
                   <Legend />
@@ -318,7 +565,7 @@ const EstoqueVitrine = () => {
                   />
                   <Bar
                     dataKey="estoque_congelador_kg"
-                    fill="#022873"
+                    fill="#D98E04"
                     name="Congelador"
                     radius={[4, 4, 0, 0]}
                   />
@@ -366,8 +613,8 @@ const EstoqueVitrine = () => {
                     color: "hsl(var(--foreground))",
                   }}
                   formatter={(value: any, name: string) => [
-                    `${value} kg`,
-                    name === "exposto_na_vitrine_kg"
+                    `${value.toFixed(2)} kg`,
+                    name === "Exposto na Vitrine"
                       ? "Exposto na Vitrine"
                       : "Descongelado p/ Futuro",
                   ]}
@@ -404,10 +651,13 @@ const EstoqueVitrine = () => {
                   Estoque Total
                 </h3>
                 <p className="text-2xl font-bold text-green-500">
-                  {totalStock} kg
+                  {contexto === "dia"
+                  ? `${totalEstoqueDoDia.toFixed(2)} kg`
+                  : `${totalStock.toFixed(2)} kg`
+                  }
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Capacidade disponível
+                  Freezer + Congelador
                 </p>
               </div>
             </div>
@@ -425,7 +675,10 @@ const EstoqueVitrine = () => {
                   Descongelado Futuro
                 </h3>
                 <p className="text-2xl font-bold text-pulse-accent">
-                  {averages.descongelado_para_futuro_kg_total} kg
+                  {contexto === "dia"
+                  ? `${dadoDoDia?.descongelado_para_futuro_kg?.toFixed(2)} kg`
+                  : `${averages.descongelado_para_futuro_kg_total.toFixed(2)} kg`
+                  }
                 </p>
                 <p className="text-xs text-muted-foreground">Total preparado</p>
               </div>
@@ -444,16 +697,18 @@ const EstoqueVitrine = () => {
                   Taxa de Perda
                 </h3>
                 <p className="text-2xl font-bold text-red-500">
-                  {(
-                    (averages.quilos_estragados_kg_total /
-                      (averages.previsao_venda_kg_media *
-                        averages.total_dias)) *
-                    100
-                  ).toFixed(1)}
-                  %
+                  {contexto === "dia"
+                  ? `${((dadoDoDia.quilos_estragados_kg / (dadoDoDia.previsao_venda_kg * 1)) * 100
+                  ).toFixed(2)} %`
+                  : `${((averages.quilos_estragados_kg_total / (averages.previsao_venda_kg_media * averages.total_dias)) * 100
+                  ).toFixed(2)} %`
+                  }
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Do total previsto
+                  {contexto === "dia"
+                  ? `Do total previsto para hoje`
+                  : `Do total previsto`
+                  }
                 </p>
               </div>
             </div>

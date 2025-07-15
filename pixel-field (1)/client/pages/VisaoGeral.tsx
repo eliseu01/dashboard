@@ -44,12 +44,13 @@ import {
 
 const VisaoGeral = () => {
   const [filters, setFilters] = useState<FilterState>({
-    year: "2024",
-    month: "dezembro",
-    week: "48",
-    date: new Date(),
+    year: "2025",
+    month: "",
+    week: "",
+    date: undefined,
   });
 
+  
   // Generate mock data
   const [rawData, setRawData] = useState<any[]>([]);
 
@@ -75,6 +76,58 @@ const VisaoGeral = () => {
         setRawData(dadosTratados);
       });
   }, []);
+
+  const dadosFiltrados = useMemo(() => {
+    const meses = {
+      janeiro: 0, fevereiro: 1, março: 2, abril: 3, maio: 4, junho: 5,  
+      julho: 6, agosto: 7, setembro: 8, outubro: 9, novembro: 10, dezembro: 11
+    };
+
+    const filtrado = rawData.filter((item) => {
+      const dataItem = new Date(item.data);
+      dataItem.setDate(dataItem.getDate() + 1); // ajuste seu
+
+      // 🎯 Se filtro por data estiver ativo, ignora mês e ano
+      if (filters.date) {
+        return dataItem.toDateString() === new Date(filters.date).toDateString();
+      }
+
+      // Caso contrário, usa filtro por mês e ano
+      const anoIgual = dataItem.getFullYear().toString() === filters.year;
+      const mesIgual = dataItem.getMonth() === meses[filters.month];
+      if (!anoIgual || !mesIgual) return false;
+
+      if (filters.week) {
+        const primeiraSemana = new Date(dataItem.getFullYear(), dataItem.getMonth(), 1);
+        const diffDias = (dataItem.getTime() - primeiraSemana.getTime()) / (1000 * 60 * 60 * 24);
+        const semanaItem = Math.floor(diffDias / 7) + 1;
+        return semanaItem.toString() === filters.week;
+      }
+
+      return true;
+    });
+
+
+    console.log("DADOS FILTRADOS:", filtrado);
+    return filtrado;
+}, [rawData, filters]);
+
+
+  const contexto = useMemo(() => {
+    console.log("Contexto atualizado:", filters);
+    if (filters.date) return "dia";
+    if (filters.week) return "semana";
+    return "mês";
+  }, [filters]);
+
+  const dadoDoDia = useMemo(() => {
+    if (contexto === "dia") {
+      console.log("Dado do dia:", dadosFiltrados[0]);
+      return dadosFiltrados[0];
+    }
+    return null;
+  }, [contexto, dadosFiltrados]);
+
 
   const chartData = useMemo(() => formatChartData(rawData), [rawData]);
   const averages = useMemo(() => calculateAverages(rawData), [rawData]);
@@ -132,76 +185,10 @@ const VisaoGeral = () => {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {/* Year Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-foreground">
-                Ano
-              </label>
-              <Select
-                value={filters.year}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, year: value }))
-                }
-              >
-                <SelectTrigger className="bg-card border-pulse-primary/20">
-                  <SelectValue placeholder="Selecione o ano" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((year) => (
-                    <SelectItem key={year} value={year}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Month Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-foreground">
-                Mês
-              </label>
-              <Select
-                value={filters.month}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, month: value }))
-                }
-              >
-                <SelectTrigger className="bg-card border-pulse-primary/20">
-                  <SelectValue placeholder="Selecione o mês" />
-                </SelectTrigger>
-                <SelectContent>
-                  {months.map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {month.charAt(0).toUpperCase() + month.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            
 
             {/* Week Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-foreground">
-                Semana
-              </label>
-              <Select
-                value={filters.week}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, week: value }))
-                }
-              >
-                <SelectTrigger className="bg-card border-pulse-primary/20">
-                  <SelectValue placeholder="Selecione a semana" />
-                </SelectTrigger>
-                <SelectContent>
-                  {weeks.map((week) => (
-                    <SelectItem key={week} value={week}>
-                      Semana {week}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+           
 
             {/* Date Filter */}
             <div className="space-y-2">
@@ -242,20 +229,40 @@ const VisaoGeral = () => {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-medium opacity-90 mb-2">
-                Porcentagem Atendida Média
+                {contexto === "dia"
+                ? "Previsão de Vendas"
+                : "Porcentagem Atendida Média"}
               </h2>
               <div className="text-6xl font-bold">
-                {averages.porcentagem_atendida_media}%
+                {contexto === "dia"
+                ? `${dadoDoDia?.previsao_venda_kg?.toFixed(1)} kg`
+                : `${averages.porcentagem_atendida_media}%`
+                }
               </div>
               <p className="text-lg opacity-75 mt-2">
-                Período: {averages.total_dias} dias
+                
+                {contexto === "dia"
+                ? " "
+                : `Período: ${averages.total_dias} dias`
+                }
               </p>
             </div>
             <div className="text-right">
               <Target className="w-16 h-16 mb-4 opacity-80" />
               <div className="space-y-1 text-sm opacity-90">
-                <div>Previsão: {averages.previsao_venda_kg_media} kg/dia</div>
-                <div>Real: {averages.venda_real_kg_media} kg/dia</div>
+                
+                <div>
+                  {contexto === "dia"
+                  ? ""
+                  : `Previsão: ${averages.previsao_venda_kg_media} kg/dia`
+                  }
+                  </div>
+                <div>
+                  {contexto === "dia"
+                  ? ""
+                  : `Real: ${averages.venda_real_kg_media} kg/dia`
+                  }
+                </div>
               </div>
             </div>
           </div>
@@ -267,19 +274,31 @@ const VisaoGeral = () => {
         <Card className="bg-card/50 backdrop-blur border-pulse-primary/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Previsão Total
+              {contexto === "dia" ? "Descongelar hoje" :
+              contexto === "semana" ? "Resumo da semana" :
+              "Previsão Total"}
             </CardTitle>
             <Scale className="h-5 w-5 text-pulse-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-pulse-primary">
-              {(averages.previsao_venda_kg_media * averages.total_dias).toFixed(
-                1,
-              )}{" "}
-              kg
+              {contexto === "dia"
+              ? `${dadosFiltrados[0]?.descongelado_para_futuro_kg || 0} kg`
+              : `${averages.previsao_venda_kg_media * averages.total_dias || 0} kg`}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {averages.total_dias} dias
+              {contexto === "dia"
+                ? `Para ficar pronto em ${
+                    dadoDoDia?.data
+                      ? format(
+                          new Date(new Date(dadoDoDia.data).setDate(new Date(dadoDoDia.data).getDate() + 3)),
+                          "dd/MM/yyyy",
+                          { locale: ptBR }
+                        )
+                      : ""
+                  }`
+                : `Média: ${averages.previsao_venda_kg_media} kg/dia`
+              }
             </p>
           </CardContent>
         </Card>
@@ -287,17 +306,25 @@ const VisaoGeral = () => {
         <Card className="bg-card/50 backdrop-blur border-pulse-accent/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Vendas Realizadas
+              {contexto === "dia"
+              ? `Vendas Realizadas`
+              : `Vendas Realizadas`
+              }
             </CardTitle>
             <TrendingUp className="h-5 w-5 text-pulse-accent" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-pulse-accent">
-              {(averages.venda_real_kg_media * averages.total_dias).toFixed(1)}{" "}
-              kg
+              {contexto === "dia"
+              ? `${(dadoDoDia?.venda_real_kg).toFixed(1)} kg`
+              : `${(averages.venda_real_kg_media * averages.total_dias).toFixed(1)} kg`
+              }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Média: {averages.venda_real_kg_media} kg/dia
+              {contexto === "dia"
+              ? `Hoje`
+              : `Média: ${averages.venda_real_kg_media} kg/dia`
+              }
             </p>
           </CardContent>
         </Card>
@@ -311,15 +338,19 @@ const VisaoGeral = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-400">
-              {averages.quilos_estragados_kg_total} kg
+              {contexto === "dia"
+              ? `${(dadoDoDia?.quilos_estragados_kg).toFixed(1)} kg`
+              : `${averages.quilos_estragados_kg_total} kg`
+              }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {(
-                (averages.quilos_estragados_kg_total /
-                  (averages.previsao_venda_kg_media * averages.total_dias)) *
-                100
-              ).toFixed(1)}
-              % do total
+              {contexto === "dia"
+              ? `Hoje`
+              : `${((averages.quilos_estragados_kg_total /
+                    (averages.previsao_venda_kg_media * averages.total_dias)) *
+                      100
+                    ).toFixed(1)} % do total`
+              }
             </p>
           </CardContent>
         </Card>
@@ -333,8 +364,7 @@ const VisaoGeral = () => {
             Análise Temporal - Previsão vs Vendas Realizadas
           </CardTitle>
           <p className="text-muted-foreground">
-            Comparação detalhada dos últimos {averages.total_dias} dias com zoom
-            interativo
+            Comparação detalhada dos últimos {averages.total_dias} dias
           </p>
         </CardHeader>
         <CardContent>
@@ -375,8 +405,8 @@ const VisaoGeral = () => {
                     boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
                   }}
                   formatter={(value: any, name: string) => [
-                    `${value} kg`,
-                    name === "previsao_venda_kg"
+                    `${value.toFixed(1)} kg`,
+                    name === "Previsão de Venda"
                       ? "Previsão de Venda"
                       : "Venda Realizada",
                   ]}

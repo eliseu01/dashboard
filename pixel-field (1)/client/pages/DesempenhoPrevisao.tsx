@@ -2,13 +2,26 @@ import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  CalendarIcon,
   Download,
   Target,
   Scale,
   AlertTriangle,
   TrendingUp,
-  Calendar,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import {
   BarChart,
   Bar,
@@ -25,10 +38,17 @@ import {
   calculateAverages,
   exportToCSV,
   type VendasData,
+  type FilterState,
 } from "@/lib/data";
 
 const DesempenhoPrevisao = () => {
- const [rawData, setRawData] = useState<any[]>([]);
+  const [filters, setFilters] = useState<FilterState>({
+      year: "2025",
+      month: "",
+      week: "",
+      date: undefined,
+    });
+  const [rawData, setRawData] = useState<any[]>([]);
 
   useEffect(() => {
     fetch('/api/csv-data')
@@ -53,9 +73,98 @@ const DesempenhoPrevisao = () => {
       });
   }, []);
 
+  const dadosFiltrados = useMemo(() => {
+      const meses = {
+        janeiro: 0, fevereiro: 1, março: 2, abril: 3, maio: 4, junho: 5,  
+        julho: 6, agosto: 7, setembro: 8, outubro: 9, novembro: 10, dezembro: 11
+      };
+  
+      const filtrado = rawData.filter((item) => {
+        const dataItem = new Date(item.data);
+        dataItem.setDate(dataItem.getDate() + 1); // ajuste seu
+
+        // 🎯 Se filtro por data estiver ativo, ignora mês e ano
+        if (filters.date) {
+          return dataItem.toDateString() === new Date(filters.date).toDateString();
+        }
+
+        // Caso contrário, usa filtro por mês e ano
+        const anoIgual = dataItem.getFullYear().toString() === filters.year;
+        const mesIgual = dataItem.getMonth() === meses[filters.month];
+        if (!anoIgual || !mesIgual) return false;
+
+        if (filters.week) {
+          const primeiraSemana = new Date(dataItem.getFullYear(), dataItem.getMonth(), 1);
+          const diffDias = (dataItem.getTime() - primeiraSemana.getTime()) / (1000 * 60 * 60 * 24);
+          const semanaItem = Math.floor(diffDias / 7) + 1;
+          return semanaItem.toString() === filters.week;
+        }
+
+        return true;
+      });
+
+  
+      console.log("DADOS FILTRADOS:", filtrado);
+      return filtrado;
+  }, [rawData, filters]);
+
+  const contexto = useMemo(() => {
+    console.log("Contexto atualizado:", filters);
+    if (filters.date) return "dia";
+    if (filters.week) return "semana";
+    return "mês";
+  }, [filters]);
+
+  const dadoDoDia = useMemo(() => {
+    if (contexto === "dia") {
+      console.log("Dado do dia:", dadosFiltrados[0]);
+      return dadosFiltrados[0];
+    }
+    return null;
+  }, [contexto, dadosFiltrados]);
+
+  const linhasParaTabela = useMemo(() => {
+    // Ajusta a data de todos os objetos de rawData em +1 dia para alinhar com o filtro
+    const rawDataAjustado = rawData.map((item) => ({
+      ...item,
+      data: new Date(new Date(item.data).setDate(new Date(item.data).getDate() + 1)),
+    }));
+
+    if (filters.date) {
+      const dataSelecionada = new Date(filters.date).toDateString();
+      const index = rawDataAjustado.findIndex(
+      (item) => new Date(item.data).toDateString() === dataSelecionada
+      );
+      if (index !== -1) {
+      return rawDataAjustado.slice(index, index + 10);
+      }
+    }
+
+    // Se não tiver dia selecionado, mostra as últimas 10 linhas normalmente
+    return rawData.slice(-10);
+  }, [rawData, filters]);
+
+
 
   const averages = useMemo(() => calculateAverages(rawData), [rawData]);
   console.log("MÉDIAS CALCULADAS:", averages);
+
+  const years = ["2023", "2024", "2025"];
+  const months = [
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+  ];
+  const weeks = Array.from({ length: 52 }, (_, i) => (i + 1).toString());
 
   // Prepare data for bar chart (last 15 days for better visualization)
   const chartData = useMemo(() => {
@@ -93,7 +202,9 @@ const DesempenhoPrevisao = () => {
   };
 
   const performanceStatus = getPerformanceStatus(
-    averages.porcentagem_atendida_media,
+    contexto === "dia"
+      ? dadoDoDia?.porcentagem_atendida ?? 0
+      : averages.porcentagem_atendida_media
   );
 
   return (
@@ -118,6 +229,53 @@ const DesempenhoPrevisao = () => {
         </Button>
       </div>
 
+      <Card className="bg-gradient-to-r from-pulse-secondary/20 to-pulse-primary/20 border-pulse-primary/30">
+        <CardHeader>
+          <CardTitle className="text-xl text-foreground flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5 text-pulse-primary" />
+            Filtros de Período
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {/* Year Filter */}
+            
+
+            {/* Week Filter */}
+            
+            {/* Date Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">
+                Data
+              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal bg-card border-pulse-primary/20"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filters.date
+                      ? format(filters.date, "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecione a data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={filters.date}
+                    onSelect={(date) =>
+                      setFilters((prev) => ({ ...prev, date }))
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Performance Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Previsão vs Real Card */}
@@ -131,15 +289,31 @@ const DesempenhoPrevisao = () => {
           <CardContent className="space-y-3">
             <div>
               <div className="text-lg font-bold text-pulse-primary">
-                {averages.previsao_venda_kg_media} kg
+                {contexto === "dia"
+                ? `${dadoDoDia?.previsao_venda_kg?.toFixed(2)} kg`
+                : `${averages.previsao_venda_kg_media} kg`
+                }
               </div>
-              <p className="text-xs text-muted-foreground">Previsão média</p>
+              <p className="text-xs text-muted-foreground">
+                {contexto === "dia"
+                ? `Previsão de Hoje`
+                : `Previsão Média`
+                }
+              </p>
             </div>
             <div>
               <div className="text-lg font-bold text-pulse-accent">
-                {averages.venda_real_kg_media} kg
+                {contexto === "dia"
+                ? `${dadoDoDia?.venda_real_kg?.toFixed(2)} kg`
+                : `${averages.venda_real_kg_media} kg`
+                }
               </div>
-              <p className="text-xs text-muted-foreground">Venda real média</p>
+              <p className="text-xs text-muted-foreground">
+                {contexto === "dia"
+                ? `Venda Real de Hoje`
+                : `Venda Real Média`
+                }
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -154,7 +328,10 @@ const DesempenhoPrevisao = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-500">
-              {averages.porcentagem_atendida_media}%
+              {contexto === "dia"
+                ? `${dadoDoDia?.porcentagem_atendida?.toFixed(2)} %`
+                : `${averages.porcentagem_atendida_media}%`
+                }
             </div>
             <p
               className={`text-xs font-medium mt-1 ${performanceStatus.color}`}
@@ -174,10 +351,16 @@ const DesempenhoPrevisao = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-pulse-accent">
-              {averages.quilos_excedentes_kg_total} kg
+              {contexto === "dia"
+                ? `${dadoDoDia?.quilos_excedentes_kg?.toFixed(2)} kg`
+                : `${averages.quilos_excedentes_kg_total} kg`
+                }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {averages.total_dias} dias
+              {contexto === "dia"
+                ? `Hoje`
+                : `${averages.total_dias} dias`
+                }
             </p>
           </CardContent>
         </Card>
@@ -192,10 +375,17 @@ const DesempenhoPrevisao = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-500">
-              {averages.retirada_emergencial_kg_total} kg
+              {contexto === "dia"
+                ? `${dadoDoDia?.retirada_emergencial_kg?.toFixed(2)} kg`
+                : `${averages.retirada_emergencial_kg_total} kg`
+                }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Total do período
+              
+              {contexto === "dia"
+                ? `Hoje`
+                : `Total do período`
+                }
             </p>
           </CardContent>
         </Card>
@@ -209,58 +399,59 @@ const DesempenhoPrevisao = () => {
             Performance Diária - Porcentagem Atendida
           </CardTitle>
           <p className="text-muted-foreground">
-            Análise dos últimos 15 dias com indicadores de performance por cores
+            Análise dos últimos 15 dias
           </p>
         </CardHeader>
         <CardContent>
           <div className="h-[400px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                layout="horizontal"
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border))"
-                  opacity={0.3}
-                />
-                <XAxis
-                  type="number"
-                  domain={[0, 100]}
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="data_formatada"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
-                  width={60}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "12px",
-                    color: "hsl(var(--foreground))",
-                    boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
-                  }}
-                  formatter={(value: any) => [
-                    `${value}%`,
-                    "Porcentagem Atendida",
-                  ]}
-                  labelFormatter={(label) => `Data: ${label}`}
-                />
-                <Bar dataKey="porcentagem_atendida" radius={[0, 8, 8, 0]}>
-                  {chartData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={entry.performance_color}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                  layout="vertical"
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    opacity={0.3}
+                  />
+                  <XAxis
+                    type="number"
+                    domain={[0, 100]}
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="data_formatada"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    width={60}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "12px",
+                      color: "#fff",
+                      boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+                    }}
+                    formatter={(value: any, name: any) => [
+                      <span style={{ color: "#fff"}}>{`Porcentagem Atendida: ${value.toFixed(1)}%`}</span>,
+                    ]}
+                    labelFormatter={(label) => (
+                      <span style={{ color: "#fff" }}>{`Data: ${label}`}</span>
+                    )}
+                  />
+                  <Bar dataKey="porcentagem_atendida" radius={[0, 8, 8, 0]}>
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.performance_color}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
             </ResponsiveContainer>
           </div>
           <div className="flex items-center justify-center gap-6 mt-4 text-sm">
@@ -287,10 +478,10 @@ const DesempenhoPrevisao = () => {
       {/* Detailed Data Table */}
       <Card className="bg-card/50 backdrop-blur border-border">
         <CardHeader>
-          <CardTitle className="text-xl font-semibold flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-pulse-primary" />
+            <CardTitle className="text-xl font-semibold flex items-center gap-3">
+            <CalendarIcon className="w-5 h-5 text-pulse-primary" />
             Dados Diários Detalhados
-          </CardTitle>
+            </CardTitle>
           <p className="text-muted-foreground">
             Informações completas de performance por dia
           </p>
@@ -324,7 +515,7 @@ const DesempenhoPrevisao = () => {
                 </tr>
               </thead>
               <tbody>
-                {rawData.slice(-10).map((row, index) => {
+                {linhasParaTabela.map((row, index) => {
                   const status = getPerformanceStatus(row.porcentagem_atendida);
                   return (
                     <tr
@@ -337,7 +528,7 @@ const DesempenhoPrevisao = () => {
                         })}
                       </td>
                       <td className="p-4 text-pulse-primary font-semibold">
-                        {row.previsao_venda_kg}
+                        {row.previsao_venda_kg.toFixed(2)}
                       </td>
                       <td className="p-4 text-pulse-accent font-semibold">
                         {row.venda_real_kg}
@@ -354,14 +545,14 @@ const DesempenhoPrevisao = () => {
                                   : "text-red-500"
                           }`}
                         >
-                          {row.porcentagem_atendida}%
+                          {(row.porcentagem_atendida).toFixed(2)}%
                         </span>
                       </td>
-                      <td className="p-4">{row.quilos_excedentes_kg}</td>
+                      <td className="p-4">{(row.quilos_excedentes_kg).toFixed(2)}</td>
                       <td className="p-4">
                         {row.retirada_emergencial_kg > 0 ? (
                           <span className="text-red-500 font-semibold">
-                            {row.retirada_emergencial_kg}
+                            {(row.retirada_emergencial_kg).toFixed(2)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">0</span>
@@ -393,7 +584,7 @@ const DesempenhoPrevisao = () => {
 
       {/* Summary Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-gradient-to-br from-pulse-primary/10 to-pulse-secondary/10 border-pulse-primary/20">
+        <Card className="bg-gradient-to-br from-pulse-primary/10 to-pulse-secondary/10 border-pulse''''''''''''''''-primary/20">
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-pulse-primary rounded-xl flex items-center justify-center">

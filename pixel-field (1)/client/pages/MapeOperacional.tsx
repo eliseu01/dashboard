@@ -211,11 +211,11 @@ const MapeOperacional = () => {
               <div className="text-center">
                 <div className="text-xs text-muted-foreground">Diferença</div>
                 <div className="font-semibold">
-                  +
+                  
                   {(
                     averages.mape_operacional_media -
                     averages.mape_previsao_media
-                  ).toFixed(1)}
+                  ).toFixed(2)}
                   %
                 </div>
               </div>
@@ -265,8 +265,8 @@ const MapeOperacional = () => {
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="5%" stopColor="#022873" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#022873" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#D98E04" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#D98E04" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -307,7 +307,9 @@ const MapeOperacional = () => {
                         ? "MAPE Operacional"
                         : name === "mape_7d_avg"
                           ? "Média 7d - Previsão"
-                          : "Média 7d - Operacional",
+                          : name === "mape_operacional_7d_avg"
+                            ? "Média 7d - Operacional"
+                            : name,
                   ]}
                   labelFormatter={(label) => `Data: ${label}`}
                 />
@@ -323,7 +325,7 @@ const MapeOperacional = () => {
                 <Area
                   type="monotone"
                   dataKey="mape_operacional"
-                  stroke="#022873"
+                  stroke="#D98E04"
                   strokeWidth={2}
                   fill="url(#colorMapeOperacional)"
                   name="MAPE Operacional"
@@ -406,19 +408,19 @@ const MapeOperacional = () => {
                         })}
                       </td>
                       <td className="p-4 text-pulse-primary font-semibold">
-                        {row.previsao_venda_kg}
+                        {(row.previsao_venda_kg).toFixed(2)}
                       </td>
                       <td className="p-4 text-pulse-accent font-semibold">
                         {row.venda_real_kg}
                       </td>
                       <td className="p-4">
                         <span className={`font-bold ${mapeStatus.color}`}>
-                          {row.mape_previsao}%
+                          {(row.mape_previsao).toFixed(2)}%
                         </span>
                       </td>
                       <td className="p-4">
-                        <span className="font-bold text-pulse-secondary">
-                          {row.mape_operacional}%
+                        <span className="font-bold text-blue-500">
+                          {(row.mape_operacional).toFixed(2)}%
                         </span>
                       </td>
                       <td className="p-4">
@@ -445,8 +447,8 @@ const MapeOperacional = () => {
                                 ? "text-orange-500"
                                 : "text-green-500"
                           }`}
-                        >
-                          +{diferenca.toFixed(1)}%
+                      >
+                          {diferenca.toFixed(1)}%
                         </span>
                       </td>
                     </tr>
